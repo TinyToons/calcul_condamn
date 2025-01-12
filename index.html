@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de Condamnation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+        }
+        form, table, .info, #result-total {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007BFF;
+            color: #fff;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        .info, #result-total {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Calculateur de Condamnation</h1>
+<form id="calculateur-form">
+    <label for="capital">Montant de la condamnation (€) :</label>
+    <input type="number" id="capital" placeholder="Exemple : 2500" required>
+
+    <label for="date-signification">Date de signification :</label>
+    <input type="date" id="date-signification" required>
+
+    <label for="date-paiement">Date de paiement :</label>
+    <input type="date" id="date-paiement" required>
+
+    <button type="submit">Calculer</button>
+</form>
+
+<div id="result-total" style="display: none;">
+    <h3>Montant total dû :</h3>
+    <p><strong id="montant-total"></strong> €</p>
+</div>
+
+<div id="result">
+    <h3>Details des calculs</h3>
+    <table id="tableau-recapitulatif">
+        <thead>
+            <tr>
+                <th>Periode</th>
+                <th>Montant de depart (€)</th>
+                <th>Taux d'interet (%)</th>
+                <th>Duree (jours)</th>
+                <th>Interets generes (€)</th>
+                <th>Montant cumule (€)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="info">
+    <p>Pour plus d'informations sur les taux d'interet legaux, consultez la page des services publics : 
+        <a href="https://www.service-public.fr/particuliers/vosdroits/F1911" target="_blank">
+            Taux d'interet legal - Service Public
+        </a>.
+    </p>
+</div>
+
+<script>
+    document.getElementById("calculateur-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const capitalInitial = parseFloat(document.getElementById("capital").value);
+        const dateSignification = new Date(document.getElementById("date-signification").value);
+        const datePaiement = new Date(document.getElementById("date-paiement").value);
+
+        if (datePaiement <= dateSignification) {
+            alert("La date de paiement doit etre posterieure a la date de signification.");
+            return;
+        }
+
+        const taux = {
+            "2024_1": 4.47 / 100,
+            "2024_2": 8.16 / 100,
+            "2024_2_majore": (8.16 + 5) / 100,
+            "2025_1_majore": (7.21 + 5) / 100,
+        };
+
+        const periodes = [
+            { debut: new Date("2024-05-27"), fin: new Date("2024-06-30"), taux: taux["2024_1"] },
+            { debut: new Date("2024-07-01"), fin: new Date("2024-07-26"), taux: taux["2024_2"] },
+            { debut: new Date("2024-07-27"), fin: new Date("2024-12-31"), taux: taux["2024_2_majore"] },
+            { debut: new Date("2025-01-01"), fin: datePaiement, taux: taux["2025_1_majore"] },
+        ];
+
+        let montantCumule = capitalInitial;
+        let tableauHtml = "";
+        let capitalParAnnee = capitalInitial;
+        let anneeCourante = dateSignification.getFullYear();
+
+        periodes.forEach(periode => {
+            if (datePaiement > periode.debut) {
+                const debut = periode.debut > dateSignification ? periode.debut : dateSignification;
+                const fin = periode.fin > datePaiement ? datePaiement : periode.fin;
+
+                if (debut <= fin) {
+                    // Vérifier si l'année change à partir de la date de début
+                    if (debut.getFullYear() > anneeCourante) {
+                        capitalParAnnee = montantCumule; // Anatocisme : le montant cumulé devient le nouveau capital
+                        anneeCourante = debut.getFullYear();
+                    }
+
+                    const jours = (fin - debut) / (1000 * 60 * 60 * 24);
+                    const interets = capitalParAnnee * periode.taux * (jours / 365);
+                    montantCumule += interets;
+
+                    tableauHtml += `<tr>
+                        <td>${debut.toLocaleDateString()} - ${fin.toLocaleDateString()}</td>
+                        <td>${capitalParAnnee.toFixed(2)}</td>
+                        <td>${(periode.taux * 100).toFixed(2)}</td>
+                        <td>${jours}</td>
+                        <td>${interets.toFixed(2)}</td>
+                        <td>${montantCumule.toFixed(2)}</td>
+                    </tr>`;
+                }
+            }
+        });
+
+        document.querySelector("#tableau-recapitulatif tbody").innerHTML = tableauHtml;
+        document.getElementById("montant-total").textContent = montantCumule.toFixed(2);
+        document.getElementById("result-total").style.display = "block";
+    });
+</script>
+
+</body>
+</html>
